@@ -2,20 +2,20 @@ import numpy as np
 
 epsilon = 0.3
 
-articles = dict
-values = None
+articles = dict()
+articles_prob = dict()
 
-def set_articles(articles):
-    print("Articles: ",articles)
-    for article in articles:
-      #  print("Article: ", article)
-        articles[article] = 0
-    return articles
+def set_articles(barticles):
+    for key in barticles.keys():
+        articles[key] = barticles[key]
+        articles_prob[key] = 0
 
 
 def update(reward):
-    #print(reward)
-    pass
+    print(articles_prob[last_choice])
+    print(last_choice)
+    articles_prob[last_choice] = articles_prob[last_choice] + reward
+
 
 
 def epsilon_greedy(choices):
@@ -23,19 +23,23 @@ def epsilon_greedy(choices):
     #If random < epsilon, we simply pick a random article
     choice = None
     if random < epsilon:
-        article_index = np.random.uniform(0,len(choices))
+        article_index = int(np.random.uniform(0,len(choices)))
         choice = choices[article_index]
     else:
         max = -1
         for article in choices:
-            if articles[article] > max:
+            if articles_prob[article] > max:
                 choice = article
-                max = articles[article]
+                max = articles.get(article)
+        if max == 0:
+            choice = articles.get(int(np.random.uniform(0,len(choices))))
 
+    global last_choice
+    last_choice = choice
     return choice
 
 
 def recommend(time, user_features, choices):
     #print("choices: ", choices)
-    #choice = epsilon_greedy(choices)
-    return choices[0]
+    choice = epsilon_greedy(choices)
+    return choice
