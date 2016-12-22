@@ -4,6 +4,8 @@ import numpy as np
 from numpy.linalg import inv
 from numpy import transpose, inner, log
 
+from random import randint
+
 
 # ALPHA = 1 # unknown parameter
 DELTA = 0.05
@@ -14,7 +16,6 @@ ALPHA = 1 + (log(2/DELTA)/2)**0.5
 X = dict()
 M = dict()
 B = dict()
-W = dict()
 
 Z = list()
 
@@ -37,15 +38,17 @@ def update(reward):
 
 def recommend(time, user_features, choices):
     UCB = dict()
-    Z.append(np.array(user_features))
-    z = Z[-1]
+    z = np.array(user_features)
+    Z.append(z)
     for x in choices:
         if x not in M:
             M[x] = np.eye(len(user_features))
             B[x] = np.zeros(len(user_features))
-        W[x] = inner(inv(M[x]), B[x])
-        UCB[x] = inner(W[x], z) * ALPHA * inner(inner(z, inv(M[x])), z)
+        wx = inner(inv(M[x]), B[x])
+        UCB[x] = inner(wx, z) + 
+                 ALPHA * inner(inner(z, inv(M[x])), z) ** 0.5
 
     l = [(UCB[x], x) for x in UCB]
 
     return np.sort(l)[-1][1]
+
