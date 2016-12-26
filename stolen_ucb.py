@@ -1,6 +1,5 @@
 import numpy as np
 import math
-from scipy import linalg
 from numpy.linalg import inv
 
 
@@ -45,7 +44,7 @@ def update(reward):
             r = r0
         Aa[a_max] += x.dot(xT)
         ba[a_max] += r * x
-        AaI[a_max] = linalg.solve(Aa[a_max], np.identity(d))
+        AaI[a_max] = inv(Aa[a_max])
         theta[a_max] = AaI[a_max].dot(ba[a_max])
     else:
         # error
@@ -82,5 +81,5 @@ def recommend(time, user_features, articles):
     xT = xaT
     # article index with largest UCB
     # self.a_max = art_max # divmod(pa.argmax(), pa.shape[0])[1]
-    print(a_max)
+    # print(a_max)
     return a_max
