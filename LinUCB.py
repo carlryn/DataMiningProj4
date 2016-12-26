@@ -2,8 +2,8 @@ from __future__ import print_function
 import numpy as np
 # from np import *
 from numpy.linalg import inv
-from numpy import transpose, inner, log
-
+from numpy import transpose, inner, log, dot
+from scipy import linalg
 from random import randint
 
 
@@ -15,25 +15,50 @@ ALPHA = 1 + (log(2/DELTA)/2)**0.5
 # Z = dict()
 X = dict()
 M = dict()
+MInv = dict()
+
 B = dict()
 
 Z = list()
 
+W = dict()
+
 COUNTER = 0 
+LastChoice = list()
 
 def set_articles(barticles):
-    X = {key: np.asarray(barticles[key]) for key in barticles} # not used by algorithm
+    for key in barticles:
+        feature_length = len(barticles[key])
+        X[key] = barticles[key] # not used by algorithm
+        M[key] = np.eye(feature_length)
+        MInv[key] = np.eye(feature_length)
+
+        B[key] = np.zeros(feature_length)
+
+        W[key] = np.zeros(feature_length)
 
 
 def update(reward):
     global COUNTER
     COUNTER += 1
     print("\rcounter: {}".format(COUNTER), end="")
-    z = Z[-1]
-    for x in M:
-        M[x] += inner(z, z)
-        B[x] += reward * z
 
+    if reward == -1:
+        return
+
+    if reward == 1:
+        r = 0.5
+    else:
+        r = -20
+
+    x = LastChoice[-1]
+    z = Z[-1]
+
+    M[x] += inner(z, z) 
+    MInv[x] = linalg.solve(M[x], np.eye(len(z)))
+    B[x] += reward * z
+
+    W[x] = dot(MInv[x], B[x])
 
 
 def recommend(time, user_features, choices):
@@ -41,14 +66,17 @@ def recommend(time, user_features, choices):
     z = np.array(user_features)
     Z.append(z)
     for x in choices:
-        if x not in M:
-            M[x] = np.eye(len(user_features))
-            B[x] = np.zeros(len(user_features))
-        wx = inner(inv(M[x]), B[x])
-        UCB[x] = inner(wx, z) + 
-                 ALPHA * inner(inner(z, inv(M[x])), z) ** 0.5
+        Minv = MInv[x]
+        wx = W[x]
+        UCB[x] = inner(wx, z) + \
+                 ALPHA * np.sqrt(dot(dot(z, Minv), z))
 
-    l = [(UCB[x], x) for x in UCB]
+    maxUCB = max(UCB.values())
+    maxChoices = [x for x in UCB if UCB[x] == maxUCB]
 
-    return np.sort(l)[-1][1]
+    choice = np.random.choice(maxChoices)
+    # print(choice)
+    LastChoice.append(choice)
+
+    return choice
 
