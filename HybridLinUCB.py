@@ -3,31 +3,23 @@ import numpy as np
 # from np import *
 from numpy.linalg import inv
 from numpy import transpose, inner, log, dot
-from scipy import linalg
 from random import randint
 
 
 DELTA = 0.05
 ALPHA = 1 + np.sqrt((log(2/DELTA)/2))
 
-REWARD = 0.5
-PUNISH = -40
+REWARD = 1
+PUNISH = -20
 
 
 A = dict()
 AInv = dict()
 b = dict()
-
-
 X = dict()
-M = dict()
-MInv = dict()
-
 B = dict()
-
 Z = list()
 
-W = dict()
 
 COUNTER = 0 
 LastChoice = list()
@@ -51,9 +43,9 @@ def set_articles(barticles):
 
 
 def update(reward):
-    global COUNTER
-    COUNTER += 1
-    print("\rcounter: {}".format(COUNTER), end="")
+    # global COUNTER
+    # COUNTER += 1
+    # print("\rcounter: {}".format(COUNTER), end="")
 
     if reward == -1:
         return
@@ -76,7 +68,7 @@ def update(reward):
     b[0] += mul([B[a].transpose(), AInv[a], b[a]])
     A[a] += mul([x, x.transpose()])
     AInv[a] = inv(A[a])
-    B[a] += mul([x, x.transpose()])
+    B[a] += mul([x, z.transpose()])
     b[a] += (x * r)[0]
     A[0] += mul([z, z.transpose()]) - \
             mul([B[a].transpose(), AInv[a], B[a]])
