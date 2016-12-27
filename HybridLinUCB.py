@@ -1,104 +1,115 @@
 from __future__ import print_function
 import numpy as np
-# from np import *
 from numpy.linalg import inv
 from numpy import transpose, inner, log, dot
-from random import randint
 
 
 DELTA = 0.05
 ALPHA = 1 + np.sqrt((log(2/DELTA)/2))
-
-REWARD = 1
-PUNISH = -20
-
-
-A = dict()
-AInv = dict()
-b = dict()
-X = dict()
-B = dict()
-Z = list()
-
-
-COUNTER = 0 
-LastChoice = list()
-
-def set_articles(barticles):
-    feature_length = 0
-
-    for key in barticles:
-        feature_length = len(barticles[key])
-        X[key] = np.array([barticles[key]]).transpose()
-        A[key] = np.eye(feature_length)
-        AInv[key] = np.eye(feature_length)
-        B[key] = np.zeros((feature_length, feature_length))
-        b[key] = np.zeros(feature_length)
-
-    A[0] = np.eye(feature_length)
-    AInv[0] = np.eye(feature_length)
-    b[0] = np.zeros(feature_length)
-
-    # for key in A:
-
-
-def update(reward):
-    # global COUNTER
-    # COUNTER += 1
-    # print("\rcounter: {}".format(COUNTER), end="")
-
-    if reward == -1:
-        return
-
-    if reward == 1:
-        r = REWARD
-    else:
-        r = PUNISH
-
-
-
-
-    a = LastChoice[-1]
-    x = X[a]
-    z = Z[-1]
-
-
-    A[0] += mul([B[a].transpose(), AInv[a], B[a]])
-    AInv[0] = inv(A[0])
-    b[0] += mul([B[a].transpose(), AInv[a], b[a]])
-    A[a] += mul([x, x.transpose()])
-    AInv[a] = inv(A[a])
-    B[a] += mul([x, z.transpose()])
-    b[a] += (x * r)[0]
-    A[0] += mul([z, z.transpose()]) - \
-            mul([B[a].transpose(), AInv[a], B[a]])
-    b[0] += (r * z - mul([B[a].transpose(), AInv[a], b[a]]))[0]
+FEATURE_LENGTH = 6
+REWARD = 0.5
+PUNISH = -21
 
 
 def mul(x):
+    # for a in x:
+    #     print(a.shape)
+    # print()
     return reduce(lambda x,y: np.dot(x,y), x)
 
+class HybridLinUCB():
+    def __init__(self):
+        self.COUNTER = 0
+
+        self.X = dict()
+        self.B = dict()
+
+        self.A = {0: np.eye(FEATURE_LENGTH)}
+        self.AInv = {0: np.eye(FEATURE_LENGTH)}
+        self.b = {0: np.zeros([FEATURE_LENGTH, 1])}
+
+        self.LastChoice = None
+        self.LastUserFeature = None
+
+    def set_articles(self, articles):
+        for k in articles:
+            self.X[k] = np.array([articles[k]]).transpose()
+            self.A[k] = np.eye(FEATURE_LENGTH)
+            self.AInv[k] = np.eye(FEATURE_LENGTH)
+            self.B[k] = np.zeros([FEATURE_LENGTH,FEATURE_LENGTH])
+            self.b[k] = np.zeros([FEATURE_LENGTH,1])
+
+    def update(self, reward):
+        self.COUNTER += 1
+        print("\rcounter: {}".format(self.COUNTER), end="")
+
+        if reward == -1:
+            return
+
+        if reward == 1:
+            r = REWARD
+        else:
+            r = PUNISH
+
+
+
+
+        a = self.LastChoice
+        z = self.LastUserFeature
+        x = self.X[a]
+
+
+        self.A[0] += mul([self.B[a].transpose(), self.AInv[a], self.B[a]])
+        self.AInv[0] = inv(self.A[0])
+        self.b[0] += mul([self.B[a].transpose(), self.AInv[a], self.b[a]])
+        self.A[a] += mul([x, x.transpose()])
+        self.AInv[a] = inv(self.A[a])
+        self.B[a] += mul([x, z.transpose()])
+        self.b[a] += (x * r)
+        self.A[0] += mul([z, z.transpose()]) - \
+                    mul([self.B[a].transpose(), self.AInv[a], self.B[a]])
+        self.b[0] += (r * z - mul([self.B[a].transpose(), self.AInv[a], self.b[a]]))
+
+
+    def recommend(self, time, user_features, choices):
+        def calcP(a, beta, z):
+            theta = mul([self.AInv[a], self.b[a] - mul([self.B[a], beta])])
+            x = self.X[a]
+
+
+            sta = mul([z.transpose(), self.AInv[0], z]) - \
+                    2 * mul([z.transpose(), self.AInv[0], self.B[a].transpose(), self.AInv[a], x]) + \
+                    mul([x.transpose(), self.AInv[a], x]) + \
+                    mul([x.transpose(), self.AInv[a], self.B[a], self.AInv[0], self.B[a].transpose(), self.AInv[a], x])
+            
+            return mul([z.transpose(), beta]) + \
+                    mul([x.transpose(), theta]) + \
+                    ALPHA * np.sqrt(sta)
+
+        z = np.array([user_features]).transpose()
+        beta = mul([self.AInv[0], self.b[0]])
+
+        p = [calcP(k, beta, z) for k in choices]
+
+
+        choice = choices[np.argmax(p)]
+
+        self.LastChoice = choice
+        self.LastUserFeature = z
+
+        return choice
+
+
+policy = HybridLinUCB()
+
+def set_articles(barticles):
+    return policy.set_articles(barticles)
+
+def update(reward):
+    return policy.update(reward)
 
 def recommend(time, user_features, choices):
-    p = dict()
-    beta = mul([AInv[0], b[0]])
-    z = np.array([user_features]).transpose()
-    Z.append(z)
-    for a in choices:
-        x = X[a]
-        theta = mul([AInv[a], b[a] - mul([B[a], beta])])
-        sta = mul([z.transpose(), AInv[0], z]) - \
-              2 * mul([z.transpose(), AInv[0], B[a].transpose(), AInv[a], x]) + \
-              mul([x.transpose(), AInv[a], x]) + \
-              mul([x.transpose(), AInv[a], B[a], AInv[0], B[a].transpose(), AInv[a], x])
-        p[a] = mul([z.transpose(), beta]) + \
-               mul([x.transpose(), theta]) + \
-               ALPHA * np.sqrt(sta)
-
-    maxpa = max(p.values())
-    maxChoices = [x for x in p if p[x] == maxpa]
-    choice = np.random.choice(maxChoices)
-    LastChoice.append(choice)
-
-    return choice
+    chosen = policy.recommend(time, user_features, choices)
+    print(chosen)
+    return chosen
 
