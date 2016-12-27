@@ -3,80 +3,93 @@ import numpy as np
 # from np import *
 from numpy.linalg import inv
 from numpy import transpose, inner, log, dot
-from scipy import linalg
 from random import randint
 
 
-# ALPHA = 1 # unknown parameter
-DELTA = 0.05
-ALPHA = 1 + (log(2/DELTA)/2)**0.5
+DELTA = 0.001
+ALPHA = 1 + np.sqrt((log(2/DELTA)/2))
 
 
-# Z = dict()
-X = dict()
-M = dict()
-MInv = dict()
+REWARD = 0.5
+PUNISH = -20
 
-B = dict()
+FEATURE_LENGTH = 6 # hard coded because i'm too lazy to collect this number on runtime
 
-Z = list()
+class LinUCB():
+    def __init__(self):
+        self.COUNTER = 0 
+        self.LastChoice = None
+        self.LastUserFeature = None
 
-W = dict()
+    def set_articles(self, barticles):
+        self.X = {k: v for k,v in barticles.items()}
+        self.M = {k: np.eye(FEATURE_LENGTH,FEATURE_LENGTH) for k,v in barticles.items()}
+        self.MInv = {k: inv(v) for k,v in self.M.items()}
+        self.B = {k: np.zeros(FEATURE_LENGTH) for k in barticles.keys()}
+        self.W = {k: np.zeros(FEATURE_LENGTH) for k in barticles.keys()}
 
-COUNTER = 0 
-LastChoice = list()
+
+    def update(self, reward):
+        self.COUNTER += 1
+        print("\rcounter: {}".format(self.COUNTER), end="")
+
+        if reward == -1:
+            return
+
+        if reward == 1:
+            r = REWARD
+        else:
+            r = PUNISH
+
+        x = self.LastChoice
+        z = self.LastUserFeature
+
+        self.M[x] += np.outer(z, z) 
+        self.MInv[x] = inv(self.M[x])
+
+        self.B[x] += r * z[:,0]
+
+        self.W[x] = dot(self.MInv[x], self.B[x])
+
+
+    def recommend(self, time, user_features, choices):
+        def mul(x):
+            return reduce(lambda x,y: np.dot(x,y), x)
+        def CalcUCB(x, z):
+            b = self.B[x]
+            Minv = self.MInv[x]
+            wx = mul([Minv, b])
+
+            return float(np.inner(wx, z[:,0])) + \
+                    ALPHA * np.sqrt(mul([z.transpose(), Minv, z]))
+
+        z = np.array([user_features]).transpose()
+        UCB = [CalcUCB(k, z) for k in choices]
+
+        # maxUCB = max(UCB.values())
+        # maxChoices = [x for x in UCB if UCB[x] == maxUCB]
+
+        # choice = np.random.choice(maxChoices)
+        choice = choices[np.argmax(UCB)]
+
+        self.LastChoice = choice
+        self.LastUserFeature = z
+
+        return choice
+
+
+policy = LinUCB()
 
 def set_articles(barticles):
-    for key in barticles:
-        feature_length = len(barticles[key])
-        X[key] = barticles[key] # not used by algorithm
-        M[key] = np.eye(feature_length)
-        MInv[key] = np.eye(feature_length)
-
-        B[key] = np.zeros(feature_length)
-
-        W[key] = np.zeros(feature_length)
-
+    return policy.set_articles(barticles)
 
 def update(reward):
-    global COUNTER
-    COUNTER += 1
-    print("\rcounter: {}".format(COUNTER), end="")
-
-    if reward == -1:
-        return
-
-    if reward == 1:
-        r = 0.5
-    else:
-        r = -20
-
-    x = LastChoice[-1]
-    z = Z[-1]
-
-    M[x] += inner(z, z) 
-    MInv[x] = linalg.solve(M[x], np.eye(len(z)))
-    B[x] += reward * z
-
-    W[x] = dot(MInv[x], B[x])
-
+    return policy.update(reward)
 
 def recommend(time, user_features, choices):
-    UCB = dict()
-    z = np.array(user_features)
-    Z.append(z)
-    for x in choices:
-        Minv = MInv[x]
-        wx = W[x]
-        UCB[x] = inner(wx, z) + \
-                 ALPHA * np.sqrt(dot(dot(z, Minv), z))
+    chosen = policy.recommend(time, user_features, choices)
+    # print(chosen)
+    return chosen
 
-    maxUCB = max(UCB.values())
-    maxChoices = [x for x in UCB if UCB[x] == maxUCB]
 
-    choice = np.random.choice(maxChoices)
-    # print(choice)
-    LastChoice.append(choice)
-
-    return choice
 
