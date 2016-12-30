@@ -7,7 +7,7 @@ import sys
 
 DELTA = 0.001
 ALPHA = 1 + np.sqrt((log(2/DELTA)/2))
-USER_FEATURE_LEN = 6 #k
+USER_FEATURE_LEN = 5 #k
 ART_FEATURE_LEN  = 6 #d
 REWARD = 0.5
 PUNISH = -20
@@ -19,9 +19,9 @@ class HybridUCB:
 
     def __init__(self):
 
-        self.A0 = np.eye(USER_FEATURE_LEN)
-        self.A0Inv = np.eye(USER_FEATURE_LEN)
-        self.b0 = np.zeros([USER_FEATURE_LEN, 1])
+        self.A0 = np.eye(ART_FEATURE_LEN)
+        self.A0Inv = np.eye(ART_FEATURE_LEN)
+        self.b0 = np.zeros([ART_FEATURE_LEN, 1])
 
 
         self.A = dict()
@@ -49,8 +49,8 @@ class HybridUCB:
         else:
             r = PUNISH
 
-        z = self.LastUserF
-        x = self.Art[self.LastChoice]
+        x = self.LastUserF
+        z = self.Art[self.LastChoice]
         a = tuple(z.flatten()) + tuple(x.flatten())
 
         self.A0 += mul([self.B[a].transpose(), self.AInv[a], self.B[a]])
@@ -66,32 +66,27 @@ class HybridUCB:
 
 
     def recommend(self, timestamp, user_features, articles):
-
-
-        beta = mul([self.A0Inv, self.b0])
-        z = np.array([user_features]).transpose()
-
+        x = np.array([user_features[1:]]).transpose()
         p = dict()
 
-        ztA0Inv = mul([z.transpose(), self.A0Inv])
-        ztA0Iz = mul([ztA0Inv, z])
-
+        beta = mul([self.A0Inv, self.b0])
         for art in articles:
-            a = tuple(user_features) + tuple(self.Art[art].flatten())
+            z = self.Art[art]
+
+            a = tuple(z.flatten()) + tuple(x.flatten())
 
             if a not in self.A:
-                self.A[a] = np.eye(ART_FEATURE_LEN)
-                self.AInv[a] = np.eye(ART_FEATURE_LEN)
-                self.B[a] = np.zeros([ART_FEATURE_LEN, USER_FEATURE_LEN])
-                self.b[a] = np.zeros([ART_FEATURE_LEN, 1])
+                self.A[a] = np.eye(USER_FEATURE_LEN)
+                self.AInv[a] = np.eye(USER_FEATURE_LEN)
+                self.B[a] = np.zeros([USER_FEATURE_LEN, ART_FEATURE_LEN])
+                self.b[a] = np.zeros([USER_FEATURE_LEN, 1])
 
-            x = self.Art[art]
 
             theta = mul([self.AInv[a], self.b[a] - mul([self.B[a], beta])])
 
-            sta = ztA0Iz - \
+            sta = mul([z.transpose(), self.A0Inv, z]) - \
                   2 * mul([z.transpose(), self.A0Inv, self.B[a].transpose(), self.AInv[a], x]) + \
-                  mul([x.transpose(), self.AInv[a].transpose(), x]) + \
+                  mul([x.transpose(), self.AInv[a], x]) + \
                   mul([x.transpose(), self.AInv[a], self.B[a], self.A0Inv, self.B[a].transpose(), self.AInv[a], x])
 
             p[art] = mul([z.transpose(), beta]) + mul([x.transpose(), theta]) + ALPHA * sqrt(sta)
@@ -101,7 +96,7 @@ class HybridUCB:
         maxarts = [art for art in articles if p[art] == maxp]
         choice = np.random.choice(maxarts)
         self.LastChoice = choice
-        self.LastUserF = z
+        self.LastUserF = x
         # print(choice)
         return choice
 
