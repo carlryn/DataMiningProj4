@@ -25,10 +25,18 @@ class LinUCB():
         self.LastUserFeature = None
 
     def set_articles(self, barticles):
+        print("DELTA:", DELTA)
+        print("ALPHA:", ALPHA)
+        print("REWARD:", REWARD)
+        print("PUNISH:", PUNISH)
+
+
+        
         self.X = {k: v for k,v in barticles.items()} # Not used
-        self.M = {k: np.eye(FEATURE_LENGTH,FEATURE_LENGTH) for k,v in barticles.items()}
+        self.M = {k: np.eye(FEATURE_LENGTH) for k,v in barticles.items()}
         self.MInv = {k: inv(v) for k,v in self.M.items()}
         self.B = {k: np.zeros([FEATURE_LENGTH, 1]) for k in barticles.keys()}
+        self.wx = {k: np.zeros([FEATURE_LENGTH, 1]) for k in barticles}
 
 
     def update(self, reward):
@@ -49,11 +57,12 @@ class LinUCB():
         self.M[x] += mul([z, z.transpose()]) 
         self.MInv[x] = inv(self.M[x])
         self.B[x] += r * z
+        self.wx[x] = mul([self.MInv[x], self.B[x]])
 
 
     def recommend(self, time, user_features, choices):
         def CalcUCB(a, z):
-            wx = mul([self.MInv[a], self.B[a]])
+            wx = self.wx[a]
 
             return mul([wx.transpose(), z]) + \
                     ALPHA * np.sqrt(mul([z.transpose(), self.MInv[a], z]))
