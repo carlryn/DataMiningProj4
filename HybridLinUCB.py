@@ -4,11 +4,12 @@ from numpy.linalg import inv
 from numpy import transpose, inner, log, dot
 
 
-DELTA = 0.05
+DELTA = 0.001
 ALPHA = 1 + np.sqrt((log(2/DELTA)/2))
-FEATURE_LENGTH = 6
+k = 5
+d = 6
 REWARD = 0.5
-PUNISH = -21
+PUNISH = -20
 
 
 def mul(x):
@@ -24,9 +25,9 @@ class HybridLinUCB():
         self.X = dict()
         self.B = dict()
 
-        self.A = {0: np.eye(FEATURE_LENGTH)}
-        self.AInv = {0: np.eye(FEATURE_LENGTH)}
-        self.b = {0: np.zeros([FEATURE_LENGTH, 1])}
+        self.A = {0: np.identity(k)}
+        self.AInv = inv(self.A)
+        self.b = {0: np.zeros([k])}
 
         self.LastChoice = None
         self.LastUserFeature = None
@@ -34,10 +35,10 @@ class HybridLinUCB():
     def set_articles(self, articles):
         for k in articles:
             self.X[k] = np.array([articles[k]]).transpose()
-            self.A[k] = np.eye(FEATURE_LENGTH)
-            self.AInv[k] = np.eye(FEATURE_LENGTH)
-            self.B[k] = np.zeros([FEATURE_LENGTH,FEATURE_LENGTH])
-            self.b[k] = np.zeros([FEATURE_LENGTH,1])
+            self.A[k] = np.identity(d)
+            self.AInv[k] = inv(self.A[k])
+            self.B[k] = np.zeros([d, k])
+            self.b[k] = np.zeros([d, 1])
 
     def update(self, reward):
         self.COUNTER += 1
@@ -56,7 +57,7 @@ class HybridLinUCB():
 
         a = self.LastChoice
         z = self.LastUserFeature
-        x = self.X[a]
+        xa = self.X[a]
 
 
         self.A[0] += mul([self.B[a].transpose(), self.AInv[a], self.B[a]])
@@ -75,8 +76,6 @@ class HybridLinUCB():
         def calcP(a, beta, z):
             theta = mul([self.AInv[a], self.b[a] - mul([self.B[a], beta])])
             x = self.X[a]
-
-
             sta = mul([z.transpose(), self.AInv[0], z]) - \
                     2 * mul([z.transpose(), self.AInv[0], self.B[a].transpose(), self.AInv[a], x]) + \
                     mul([x.transpose(), self.AInv[a], x]) + \
@@ -110,6 +109,5 @@ def update(reward):
 
 def recommend(time, user_features, choices):
     chosen = policy.recommend(time, user_features, choices)
-    print(chosen)
     return chosen
 
