@@ -10,10 +10,13 @@ DELTA = 0.001
 ALPHA = 1 + np.sqrt((log(2/DELTA)/2))
 
 
-REWARD = 0.5
+REWARD = 100
 PUNISH = -20
 
 FEATURE_LENGTH = 6 # hard coded because i'm too lazy to collect this number on runtime
+
+def mul(x):
+    return reduce(lambda x,y: np.dot(x,y), x)
 
 class LinUCB():
     def __init__(self):
@@ -22,11 +25,10 @@ class LinUCB():
         self.LastUserFeature = None
 
     def set_articles(self, barticles):
-        self.X = {k: v for k,v in barticles.items()}
+        self.X = {k: v for k,v in barticles.items()} # Not used
         self.M = {k: np.eye(FEATURE_LENGTH,FEATURE_LENGTH) for k,v in barticles.items()}
         self.MInv = {k: inv(v) for k,v in self.M.items()}
-        self.B = {k: np.zeros(FEATURE_LENGTH) for k in barticles.keys()}
-        self.W = {k: np.zeros(FEATURE_LENGTH) for k in barticles.keys()}
+        self.B = {k: np.zeros([FEATURE_LENGTH, 1]) for k in barticles.keys()}
 
 
     def update(self, reward):
@@ -44,36 +46,26 @@ class LinUCB():
         x = self.LastChoice
         z = self.LastUserFeature
 
-        self.M[x] += np.outer(z, z) 
+        self.M[x] += mul([z, z.transpose()]) 
         self.MInv[x] = inv(self.M[x])
-
-        self.B[x] += r * z[:,0]
-
-        self.W[x] = dot(self.MInv[x], self.B[x])
+        self.B[x] += r * z
 
 
     def recommend(self, time, user_features, choices):
-        def mul(x):
-            return reduce(lambda x,y: np.dot(x,y), x)
-        def CalcUCB(x, z):
-            b = self.B[x]
-            Minv = self.MInv[x]
-            wx = mul([Minv, b])
+        def CalcUCB(a, z):
+            wx = mul([self.MInv[a], self.B[a]])
 
-            return float(np.inner(wx, z[:,0])) + \
-                    ALPHA * np.sqrt(mul([z.transpose(), Minv, z]))
+            return mul([wx.transpose(), z]) + \
+                    ALPHA * np.sqrt(mul([z.transpose(), self.MInv[a], z]))
 
-        z = np.array([user_features]).transpose()
-        UCB = [CalcUCB(k, z) for k in choices]
+        user_features[0] = time
+        x = np.array([user_features]).transpose()
+        UCB = [CalcUCB(k, x) for k in choices]
 
-        # maxUCB = max(UCB.values())
-        # maxChoices = [x for x in UCB if UCB[x] == maxUCB]
-
-        # choice = np.random.choice(maxChoices)
         choice = choices[np.argmax(UCB)]
 
         self.LastChoice = choice
-        self.LastUserFeature = z
+        self.LastUserFeature = x
 
         return choice
 
